@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabaseClient';
 
-const PAGE_SIZE = 20;
+const PAGE_SIZE = 100;
 
 export async function incrementLikes(id) {
   try {
