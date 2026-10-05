@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { getMediaThumbnail } from '../utils/mediaHelpers';
+import { getMediaThumbnail, getFullMediaUrl } from '../utils/mediaHelpers';
 import { incrementVideoViews } from '../services/media';
 
 export default function MediaModal({ item, onClose }) {
@@ -61,7 +61,8 @@ export default function MediaModal({ item, onClose }) {
   if (!item) return null;
 
   const isImage = item.media_type === 'image';
-  const displayImageUrl = item.image_url || getMediaThumbnail(item);
+  // Always use getFullMediaUrl for original high-res view, fallback to getMediaThumbnail
+  const displayImageUrl = getFullMediaUrl(item) || getMediaThumbnail(item);
 
   const toggleFullScreen = () => {
     if (!modalRef.current) return;
