@@ -8,14 +8,14 @@ export default function VideoGrid({
   loadingMore,
   onLoadMore,
   onSelectVideo,
-  isAdmin,       // <-- Added prop
-  onModify,      // <-- Added prop
+  isAdmin,
+  onModify,
   emptyMessage = 'No videos found.',
 }) {
   if (loading) {
     return (
       <p style={{ textAlign: 'center', color: '#888', marginTop: '40px' }}>
-        Loading videos...
+        Loading media...
       </p>
     );
   }
@@ -30,14 +30,34 @@ export default function VideoGrid({
 
   return (
     <>
-      <div style={styles.grid}>
+      <style>{`
+        .pinterest-masonry-grid {
+          column-count: 5;
+          column-gap: 16px;
+          width: 100%;
+        }
+        @media (max-width: 1400px) {
+          .pinterest-masonry-grid { column-count: 4; }
+        }
+        @media (max-width: 1024px) {
+          .pinterest-masonry-grid { column-count: 3; }
+        }
+        @media (max-width: 768px) {
+          .pinterest-masonry-grid { column-count: 2; column-gap: 12px; }
+        }
+        @media (max-width: 480px) {
+          .pinterest-masonry-grid { column-count: 1; }
+        }
+      `}</style>
+
+      <div className="pinterest-masonry-grid">
         {videos.map((video, index) => (
           <VideoCard
             key={`${video.id}-${index}`}
             video={video}
             onSelect={onSelectVideo}
-            isAdmin={isAdmin}   // <-- Pass down to VideoCard
-            onModify={onModify} // <-- Pass down to VideoCard
+            isAdmin={isAdmin}
+            onModify={onModify}
           />
         ))}
       </div>
@@ -49,7 +69,7 @@ export default function VideoGrid({
             onClick={onLoadMore}
             disabled={loadingMore}
           >
-            {loadingMore ? 'Loading...' : 'Load More Videos'}
+            {loadingMore ? 'Loading...' : 'Load More'}
           </button>
         </div>
       )}
@@ -58,12 +78,6 @@ export default function VideoGrid({
 }
 
 const styles = {
-  grid: {
-    display: 'grid',
-    gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-    gap: '20px',
-    marginTop: '0px',
-  },
   loadMoreContainer: {
     display: 'flex',
     justifyContent: 'center',
