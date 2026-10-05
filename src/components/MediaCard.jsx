@@ -261,7 +261,7 @@ const styles = {
   },
   title: {
     color: '#ffffff',
-    fontSize: '0.95rem',
+    fontSize: '0.80rem',
     fontWeight: '600',
     margin: 0,
     lineHeight: '1.3',
