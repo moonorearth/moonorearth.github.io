@@ -34,14 +34,20 @@ const styles = {
     color: '#fff',
     fontSize: '0.85rem',
     outline: 'none',
+    boxSizing: 'border-box', // Ensure padding doesn't push width outside container
   },
   clearBtn: {
     position: 'absolute',
     right: '10px',
+    top: '50%',
+    transform: 'translateY(-50%)', // Vertically center the button
     background: 'none',
     border: 'none',
     color: '#888',
     cursor: 'pointer',
-    fontSize: '0.8rem',
+    fontSize: '0.9rem',
+    lineHeight: '1',
+    padding: '0',
+    zIndex: 2, // Ensure it stays above input
   },
 };
