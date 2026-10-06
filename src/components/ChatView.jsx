@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useChat } from '../hooks/useChat';
 
 const PILL_COLORS = [
@@ -33,6 +33,8 @@ const getPillStyle = (name = '') => {
 export default function ChatView({ isUnlocked, isAdmin }) {
   const [showGuidelines, setShowGuidelines] = useState(false);
   const textareaRef = useRef(null);
+  const chatFeedRef = useRef(null);
+
   const {
     chatMessages, loading, loadingMore, hasMore, loadMore,
     name, setName, content, setContent, formError, formSuccess,
@@ -41,11 +43,18 @@ export default function ChatView({ isUnlocked, isAdmin }) {
 
   const formatCooldown = (s) => `${Math.floor(s / 60)}m ${s % 60 < 10 ? '0' : ''}${s % 60}s`;
 
+  // Auto-scroll feed to bottom so latest/newest messages are shown on start page
+  useEffect(() => {
+    if (chatFeedRef.current) {
+      chatFeedRef.current.scrollTop = chatFeedRef.current.scrollHeight;
+    }
+  }, [chatMessages, loading]);
+
   const handleTextareaChange = (e) => {
     setContent(e.target.value);
     if (textareaRef.current) {
       textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height = `${Math.max(textareaRef.current.scrollHeight, 70)}px`;
+      textareaRef.current.style.height = `${Math.min(textareaRef.current.scrollHeight, 120)}px`;
     }
   };
 
@@ -55,8 +64,17 @@ export default function ChatView({ isUnlocked, isAdmin }) {
   };
 
   return (
-    <div style={s.container}>
+    <div style={s.fixedWrapper}>
       <style>{`
+        /* Hide scrollbar completely while keeping scroll active */
+        .no-scrollbar {
+          scrollbar-width: none;
+          -ms-overflow-style: none;
+        }
+        .no-scrollbar::-webkit-scrollbar {
+          display: none;
+        }
+
         .delete-btn-hover {
           transition: transform 0.15s ease, opacity 0.15s ease !important;
         }
@@ -66,37 +84,45 @@ export default function ChatView({ isUnlocked, isAdmin }) {
         }
       `}</style>
 
-      {/* Top Bar with Guidelines Button */}
-      <div style={s.topBar}>
-        <span style={s.chatHeaderTitle}>💬 Chat</span>
-        <button style={s.noteBtn} onClick={() => setShowGuidelines(!showGuidelines)}>
-          📌 Note {showGuidelines ? '✕' : ''}
-        </button>
+      {/* Edge-to-Edge Top Bar at position top:0 */}
+      <div style={s.topBarContainer}>
+        <div style={s.topBar}>
+          <span style={s.chatHeaderTitle}>🗫 Chat</span>
+          <button style={s.noteBtn} onClick={() => setShowGuidelines(!showGuidelines)}>
+            📌 Note {showGuidelines ? '✕' : ''}
+          </button>
+        </div>
+
+        {/* Guidelines Drawer */}
+        {showGuidelines && (
+          <div className="no-scrollbar" style={s.guidelinesBox}>
+            <h4 style={s.guidelinesHeading}>📌 Chat Guidelines:</h4>
+            <div style={s.guidelinesWarning}>You can't delete, edit your messages and you can send one message per hour.</div>
+            <br />
+            <h4 style={s.guidelinesHeading}>📌 New Person Request Guidelines:</h4>
+            <ul style={s.guidelinesList}>
+              <li><strong>A real photo of the person</strong> - their face must be clearly visible and not covered by accessories, hair, or other objects.</li>
+              <li><strong>At least one social media link</strong> to the person’s official or public profile.</li>
+              <li><strong>Their popular social name or nickname</strong> - the name they are commonly known by online.</li>
+            </ul>
+            <div style={s.guidelinesWarning}>Requests missing any of the above information may not be approved.</div>
+          </div>
+        )}
+
+        {/* Alert Messages */}
+        {cooldownSeconds > 0 && <div style={s.cooldownAlert}>⏳ Cooldown active: <strong>{formatCooldown(cooldownSeconds)}</strong> remaining</div>}
+        {formError && <div style={s.errorAlert}>{formError}</div>}
+        {formSuccess && <div style={s.successAlert}>{formSuccess}</div>}
       </div>
 
-      {/* Guidelines Box */}
-      {showGuidelines && (
-        <div style={s.guidelinesBox}>
-          <h4 style={s.guidelinesHeading}>📌 Chat Guidelines:</h4>
-          <div style={s.guidelinesWarning}>You can't delete, edit your messages and you can send one message per hour.</div>
-          <br />
-          <h4 style={s.guidelinesHeading}>📌 New Person Request Guidelines:</h4>
-          <ul style={s.guidelinesList}>
-            <li><strong>A real photo of the person</strong> - their face must be clearly visible and not covered by accessories, hair, or other objects.</li>
-            <li><strong>At least one social media link</strong> to the person’s official or public profile.</li>
-            <li><strong>Their popular social name or nickname</strong> - the name they are commonly known by online.</li>
-          </ul>
-          <div style={s.guidelinesWarning}>Requests missing any of the above information may not be approved.</div>
-        </div>
-      )}
+      {/* Single Scrollable Chat Stream (Oldest top, Newest bottom) */}
+      <div ref={chatFeedRef} className="no-scrollbar" style={s.chatFeed}>
+        {hasMore && (
+          <button onClick={loadMore} disabled={loadingMore} style={s.loadBtn}>
+            {loadingMore ? 'Loading...' : 'Load older messages'}
+          </button>
+        )}
 
-      {/* Status Alerts */}
-      {cooldownSeconds > 0 && <div style={s.cooldownAlert}>⏳ Cooldown active: <strong>{formatCooldown(cooldownSeconds)}</strong> remaining</div>}
-      {formError && <div style={s.errorAlert}>{formError}</div>}
-      {formSuccess && <div style={s.successAlert}>{formSuccess}</div>}
-
-      {/* Chat Stream Feed */}
-      <div style={s.chatFeed}>
         {loading ? (
           <div style={s.statusMsg}>Loading messages...</div>
         ) : chatMessages.length === 0 ? (
@@ -109,7 +135,6 @@ export default function ChatView({ isUnlocked, isAdmin }) {
                   <span style={getPillStyle(item.name)}>{item.name}</span>
                   <span style={s.postId}>#{item.id}</span>
 
-                  {/* Header Right Group: Delete icon (if Admin) + Time */}
                   <div style={s.headerRight}>
                     {isAdmin && (
                       <button
@@ -137,64 +162,98 @@ export default function ChatView({ isUnlocked, isAdmin }) {
             </div>
           ))
         )}
-        {hasMore && (
-          <button onClick={loadMore} disabled={loadingMore} style={s.loadBtn}>
-            {loadingMore ? 'Loading...' : 'Load older messages'}
-          </button>
-        )}
       </div>
 
-      {/* Input Bar */}
-      <form onSubmit={submitMessage} style={s.inputBar}>
-        <div style={s.inputTopRow}>
-          <input
-            type="text"
-            placeholder="Name (Max 10 letters)"
-            maxLength={10}
-            value={name}
-            onChange={handleNameChange}
-            disabled={cooldownSeconds > 0 || submitting}
-            style={s.nameInput}
-          />
-          <span style={s.charCount}>{content.length}/2000</span>
-        </div>
-        <div style={s.inputBottomRow}>
-          <textarea
-            ref={textareaRef}
-            placeholder="Type your message here..."
-            maxLength={2000}
-            rows={3}
-            value={content}
-            onChange={handleTextareaChange}
-            disabled={cooldownSeconds > 0 || submitting}
-            style={s.textarea}
-          />
-          <button
-            type="submit"
-            disabled={cooldownSeconds > 0 || submitting || !name.trim() || !content.trim()}
-            style={cooldownSeconds > 0 || submitting || !name.trim() || !content.trim() ? s.sendBtnDisabled : s.sendBtn}
-          >
-            {submitting ? '...' : 'Send 🚀'}
-          </button>
-        </div>
-      </form>
+      {/* Edge-to-Edge Bottom Input Bar */}
+      <div style={s.inputContainer}>
+        <form onSubmit={submitMessage} style={s.inputBar}>
+          <div style={s.inputTopRow}>
+            <input
+              type="text"
+              placeholder="Name (Max 10 letters)"
+              maxLength={10}
+              value={name}
+              onChange={handleNameChange}
+              disabled={cooldownSeconds > 0 || submitting}
+              style={s.nameInput}
+            />
+            <span style={s.charCount}>{content.length}/2000</span>
+          </div>
+          <div style={s.inputBottomRow}>
+            <textarea
+              ref={textareaRef}
+              placeholder="Type your message here..."
+              maxLength={2000}
+              rows={2}
+              value={content}
+              onChange={handleTextareaChange}
+              disabled={cooldownSeconds > 0 || submitting}
+              style={s.textarea}
+            />
+            <button
+              type="submit"
+              disabled={cooldownSeconds > 0 || submitting || !name.trim() || !content.trim()}
+              style={cooldownSeconds > 0 || submitting || !name.trim() || !content.trim() ? s.sendBtnDisabled : s.sendBtn}
+            >
+              {submitting ? '...' : 'Send 🚀'}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
 
 const s = {
-  container: { width: '100%', maxWidth: '100%', margin: '0 auto', padding: '0 4px', display: 'flex', flexDirection: 'column', gap: '10px', boxSizing: 'border-box' },
-  topBar: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 14px', backgroundColor: '#161616', borderRadius: '10px', border: '1px solid #282828' },
+  fixedWrapper: {
+    position: 'fixed',
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    zIndex: 999, // Overrides outer container margins & main page scrollbar
+    backgroundColor: '#0d0d0d',
+    display: 'flex',
+    flexDirection: 'column',
+    padding: '12px 16px',
+    boxSizing: 'border-box',
+    overflow: 'hidden',
+  },
+  topBarContainer: {
+    flexShrink: 0,
+    backgroundColor: '#0d0d0d',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '8px',
+    paddingBottom: '8px',
+  },
+  topBar: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '10px 14px',
+    backgroundColor: '#161616',
+    borderRadius: '10px',
+    border: '1px solid #282828',
+  },
   chatHeaderTitle: { fontSize: '0.92rem', fontWeight: 'bold', color: '#eee' },
   noteBtn: { backgroundColor: '#252525', color: '#ffc107', border: '1px solid #3d3d3d', borderRadius: '6px', padding: '4px 10px', fontSize: '0.78rem', fontWeight: '600', cursor: 'pointer' },
-  guidelinesBox: { backgroundColor: '#1a1810', border: '1px solid #d4a373', borderRadius: '10px', padding: '12px 16px' },
+  guidelinesBox: { backgroundColor: '#1a1810', border: '1px solid #d4a373', borderRadius: '10px', padding: '12px 16px', maxHeight: '180px', overflowY: 'auto' },
   guidelinesHeading: { margin: '0 0 6px 0', color: '#ffb703', fontSize: '0.85rem' },
   guidelinesList: { margin: 0, paddingLeft: '18px', fontSize: '0.8rem', color: '#ddd', lineHeight: '1.4' },
   guidelinesWarning: { marginTop: '8px', fontSize: '0.75rem', color: '#ff6b6b', fontWeight: 'bold' },
   cooldownAlert: { backgroundColor: 'rgba(255, 171, 0, 0.12)', border: '1px solid #ffab00', color: '#ffc107', padding: '8px 12px', borderRadius: '8px', fontSize: '0.8rem', textAlign: 'center' },
   errorAlert: { backgroundColor: 'rgba(255, 77, 77, 0.12)', border: '1px solid #ff4d4d', color: '#ff4d4d', padding: '8px 12px', borderRadius: '8px', fontSize: '0.8rem', textAlign: 'center' },
   successAlert: { backgroundColor: 'rgba(0, 230, 118, 0.12)', border: '1px solid #00e676', color: '#00e676', padding: '8px 12px', borderRadius: '8px', fontSize: '0.8rem', textAlign: 'center' },
-  chatFeed: { display: 'flex', flexDirection: 'column', gap: '10px', minHeight: '300px', padding: '0px', backgroundColor: '#111', border: 'none' },
+  chatFeed: {
+    flex: 1,
+    overflowY: 'auto',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px',
+    padding: '8px 0',
+    backgroundColor: 'transparent',
+  },
   chatBubble: { backgroundColor: '#1a1a1a', padding: '10px 14px', borderRadius: '12px', border: '1px solid #262626' },
   msgBody: { width: '100%' },
   msgHeader: { display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '6px' },
@@ -204,13 +263,18 @@ const s = {
   time: { fontSize: '0.7rem', color: '#666' },
   msgText: { fontSize: '0.88rem', color: '#ccc', lineHeight: '1.45', whiteSpace: 'pre-wrap', wordBreak: 'break-word' },
   statusMsg: { textAlign: 'center', color: '#666', fontSize: '0.85rem', padding: '30px 0' },
-  loadBtn: { alignSelf: 'center', backgroundColor: '#222', border: '1px solid #333', color: '#aaa', padding: '6px 14px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer' },
+  loadBtn: { alignSelf: 'center', backgroundColor: '#222', border: '1px solid #333', color: '#aaa', padding: '6px 14px', borderRadius: '6px', fontSize: '0.78rem', cursor: 'pointer', marginBottom: '6px' },
+  inputContainer: {
+    flexShrink: 0,
+    backgroundColor: '#0d0d0d',
+    paddingTop: '8px',
+  },
   inputBar: { display: 'flex', flexDirection: 'column', gap: '8px', backgroundColor: '#161616', padding: '12px', borderRadius: '12px', border: '1px solid #282828' },
   inputTopRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   nameInput: { backgroundColor: '#0d0d0d', border: '1px solid #333', borderRadius: '6px', padding: '6px 10px', color: '#fff', fontSize: '0.8rem', width: '160px', outline: 'none' },
   charCount: { fontSize: '0.72rem', color: '#666' },
   inputBottomRow: { display: 'flex', gap: '8px', alignItems: 'flex-end' },
-  textarea: { flex: 1, backgroundColor: '#0d0d0d', border: '1px solid #333', borderRadius: '8px', padding: '8px 12px', color: '#fff', fontSize: '0.85rem', outline: 'none', resize: 'vertical', minHeight: '70px', maxHeight: '300px', overflowY: 'auto' },
+  textarea: { flex: 1, backgroundColor: '#0d0d0d', border: '1px solid #333', borderRadius: '8px', padding: '8px 12px', color: '#fff', fontSize: '0.85rem', outline: 'none', resize: 'none', minHeight: '50px', maxHeight: '120px', overflowY: 'auto' },
   sendBtn: { backgroundColor: '#0070f3', color: '#fff', border: 'none', borderRadius: '8px', padding: '0 16px', height: '38px', fontWeight: 'bold', fontSize: '0.82rem', cursor: 'pointer', whiteSpace: 'nowrap' },
   sendBtnDisabled: { backgroundColor: '#2a2a2a', color: '#555', border: 'none', borderRadius: '8px', padding: '0 16px', height: '38px', fontWeight: 'bold', fontSize: '0.82rem', cursor: 'not-allowed', whiteSpace: 'nowrap' }
 };
