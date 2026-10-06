@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { getAllCategories } from '../services/categories';
+import SearchBar from './SearchBar';
 
 const FEED_EMOJIS = ['🌏', '🌎', '🌍'];
 
@@ -157,13 +158,7 @@ export default function Navbar({
         </div>
 
         <div className="desktop-only" style={styles.searchContainer}>
-          <input
-            type="text"
-            placeholder="Search titles..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={styles.searchInput}
-          />
+          <SearchBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
         </div>
 
         <div style={styles.rightActions}>
@@ -201,13 +196,9 @@ export default function Navbar({
 
       {mobileMenuOpen && (
         <div className="mobile-drawer" style={styles.mobileDrawer}>
-          <input
-            type="text"
-            placeholder="Search titles..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{ ...styles.searchInput, marginBottom: '12px' }}
-          />
+          <div style={{ marginBottom: '12px' }}>
+            <SearchBar searchQuery={searchQuery} setSearchQuery={setSearchQuery} />
+          </div>
 
           <div style={styles.mobileTabList}>
             {navTabs.map((tab) => (
@@ -275,7 +266,6 @@ const styles = {
   tab: { background: 'none', border: 'none', color: '#888', fontSize: '0.9rem', fontWeight: '600', cursor: 'pointer', padding: '6px 12px', borderRadius: '6px', whiteSpace: 'nowrap' },
   activeTab: { background: '#222', border: 'none', color: '#fff', fontSize: '0.9rem', fontWeight: '600', cursor: 'pointer', padding: '6px 12px', borderRadius: '6px', whiteSpace: 'nowrap' },
   searchContainer: { flex: '0 1 240px' },
-  searchInput: { width: '100%', padding: '8px 14px', borderRadius: '20px', border: '1px solid #333', backgroundColor: '#0d0d0d', color: '#fff', outline: 'none', fontSize: '0.85rem', boxSizing: 'border-box' },
   rightActions: { display: 'flex', alignItems: 'center', gap: '12px', flexShrink: 0 },
   loginIconButton: {
     background: '#1f1f1f',
