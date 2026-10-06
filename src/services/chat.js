@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabaseClient';
 
-const PAGE_SIZE = 15;
+const PAGE_SIZE = 50
 
 /**
  * Fetch client IP address to use as hash/identifier
@@ -23,6 +23,7 @@ export async function getChatMessages(page = 0) {
   const from = page * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
+  // Fetch newest messages from database
   const { data, error, count } = await supabase
     .from('chat')
     .select('*', { count: 'exact' })
@@ -34,7 +35,9 @@ export async function getChatMessages(page = 0) {
     return { chatMessages: [], hasMore: false };
   }
 
-  const items = data || [];
+  // Reverse so array order is Chronological (Oldest at top [0], Newest at bottom)
+  const items = (data || []).slice().reverse();
+
   return {
     chatMessages: items,
     hasMore: count ? to + 1 < count : false,
