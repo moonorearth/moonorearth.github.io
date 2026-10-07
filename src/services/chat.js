@@ -66,7 +66,7 @@ export async function checkCooldown(ipHash) {
   const lastPostTime = new Date(data[0].created_at).getTime();
   const now = Date.now();
   const elapsedSeconds = Math.floor((now - lastPostTime) / 1000);
-  const COOLDOWN_DURATION = 3600; // 1 hour in seconds
+  const COOLDOWN_DURATION = 60; // 1 hour in seconds
 
   if (elapsedSeconds < COOLDOWN_DURATION) {
     return {
