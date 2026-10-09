@@ -1,6 +1,8 @@
 import { supabase } from '../lib/supabaseClient';
 
-const PAGE_SIZE = 50
+const PAGE_SIZE = 100;
+
+export const COOLDOWN_DURATION_SECONDS = 60; // 1 minute (e.g. 3600 for 1 hour)
 
 /**
  * Fetch client IP address to use as hash/identifier
@@ -23,7 +25,6 @@ export async function getChatMessages(page = 0) {
   const from = page * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
-  // Fetch newest messages from database
   const { data, error, count } = await supabase
     .from('chat')
     .select('*', { count: 'exact' })
@@ -35,7 +36,6 @@ export async function getChatMessages(page = 0) {
     return { chatMessages: [], hasMore: false };
   }
 
-  // Reverse so array order is Chronological (Oldest at top [0], Newest at bottom)
   const items = (data || []).slice().reverse();
 
   return {
@@ -45,7 +45,7 @@ export async function getChatMessages(page = 0) {
 }
 
 /**
- * Check if the user is on 1-hour cooldown from the database
+ * Check if the user is on cooldown from the database
  */
 export async function checkCooldown(ipHash) {
   if (!ipHash || ipHash === 'anonymous_client') {
@@ -66,12 +66,11 @@ export async function checkCooldown(ipHash) {
   const lastPostTime = new Date(data[0].created_at).getTime();
   const now = Date.now();
   const elapsedSeconds = Math.floor((now - lastPostTime) / 1000);
-  const COOLDOWN_DURATION = 60; // 1 hour in seconds
 
-  if (elapsedSeconds < COOLDOWN_DURATION) {
+  if (elapsedSeconds < COOLDOWN_DURATION_SECONDS) {
     return {
       onCooldown: true,
-      remainingSeconds: COOLDOWN_DURATION - elapsedSeconds,
+      remainingSeconds: COOLDOWN_DURATION_SECONDS - elapsedSeconds,
     };
   }
 
