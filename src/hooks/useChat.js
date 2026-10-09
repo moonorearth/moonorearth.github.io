@@ -5,6 +5,7 @@ import {
   deleteChatMessage,
   checkCooldown,
   getClientIp,
+  COOLDOWN_DURATION_SECONDS, // 👈 Imported dynamic constant
 } from '../services/chat';
 
 export function useChat(isUnlocked) {
@@ -23,6 +24,12 @@ export function useChat(isUnlocked) {
   const [formError, setFormError] = useState('');
   const [formSuccess, setFormSuccess] = useState('');
 
+  // Helper to dynamically format error message (e.g., "1-minute" or "1-hour")
+  const cooldownLabel =
+    COOLDOWN_DURATION_SECONDS >= 3600
+      ? `${Math.round(COOLDOWN_DURATION_SECONDS / 3600)}-hour`
+      : `${Math.round(COOLDOWN_DURATION_SECONDS / 60)}-minute`;
+
   // Fetch client IP on mount
   useEffect(() => {
     async function initIp() {
@@ -32,7 +39,7 @@ export function useChat(isUnlocked) {
     initIp();
   }, []);
 
-  // Check 1-hour cooldown
+  // Check cooldown status from database
   useEffect(() => {
     if (!ipHash) return;
 
@@ -71,7 +78,7 @@ export function useChat(isUnlocked) {
 
     const result = await getChatMessages(pageNum);
 
-    setChatMessages((prev) => (pageNum === 0 ? result.chatMessages : [...prev, ...result.chatMessages]));
+    setChatMessages((prev) => (pageNum === 0 ? result.chatMessages : [...result.chatMessages, ...prev]));
     setHasMore(result.hasMore);
     setLoading(false);
     setLoadingMore(false);
@@ -130,7 +137,7 @@ export function useChat(isUnlocked) {
     }
 
     if (cooldownSeconds > 0) {
-      setFormError('You are currently on a 1-hour posting cooldown.');
+      setFormError(`You are currently on a ${cooldownLabel} posting cooldown.`);
       return;
     }
 
@@ -143,11 +150,14 @@ export function useChat(isUnlocked) {
         ipHash,
       });
 
-      setChatMessages((prev) => [newPost, ...prev]);
+      // Appends new message instantly to bottom
+      setChatMessages((prev) => [...prev, newPost]);
       setName('Anonymous');
       setContent('');
       setFormSuccess('Message posted successfully!');
-      setCooldownSeconds(3600);
+      
+      // 🚀 Sets cooldown dynamically from imported constant
+      setCooldownSeconds(COOLDOWN_DURATION_SECONDS);
     } catch (err) {
       console.error('Error submitting message:', err);
       setFormError('Failed to post message. Please try again.');
