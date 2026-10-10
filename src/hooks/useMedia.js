@@ -22,7 +22,6 @@ export function useMedia({
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
 
-  // Active categories only apply to recent and most_viewed now
   const getActiveCategories = () => {
     if (activeTab === 'most_viewed') return mostViewedCategories;
     return recentCategories;
@@ -34,7 +33,6 @@ export function useMedia({
     .filter(Boolean);
   const categoryKey = categoryIds.sort().join(',');
 
-  // Separate cache namespaces for feed (vertical shorts) vs random (grid)
   const cacheRef = useRef({
     feed: [],
     random: [],
@@ -49,7 +47,7 @@ export function useMedia({
     setPage(0);
   }, [activeTab, categoryKey, recentAsc, viewsAsc, debouncedSearchQuery]);
 
-  // Handle Explicit Reshuffle (Bypasses cache and clears state)
+  // Handle Explicit Reshuffle
   useEffect(() => {
     if (shuffleTrigger > 0 && prevShuffleTriggerRef.current !== shuffleTrigger) {
       prevShuffleTriggerRef.current = shuffleTrigger;
@@ -70,20 +68,18 @@ export function useMedia({
 
     const trimmedQuery = debouncedSearchQuery ? debouncedSearchQuery.trim() : '';
     const isSecretSearch = trimmedQuery.startsWith('?');
-    const searchTerm = isSecretSearch ? trimmedQuery.slice(1).trim() : '';
+    const searchTerm = isSecretSearch ? trimmedQuery.slice(1).trim() : trimmedQuery;
 
-    if (
-      (trimmedQuery !== '' && !isSecretSearch) ||
-      (isSecretSearch && searchTerm.length < 3)
-    ) {
+    // Ignore secret searches shorter than 3 characters
+    if (isSecretSearch && searchTerm.length < 3) {
       return;
     }
 
     const sortKeyRecent = `${categoryKey}_${recentAsc ? 'asc' : 'desc'}`;
     const sortKeyViews = `${categoryKey}_${viewsAsc ? 'asc' : 'desc'}`;
 
-    // Cache hit check on page 0
-    if (!isSecretSearch && page === 0) {
+    // Cache hit check on page 0 (Disabled when active search query exists)
+    if (!trimmedQuery && page === 0) {
       if (activeTab === 'feed' && cacheRef.current.feed.length > 0) {
         setMedia(cacheRef.current.feed);
         setHasMore(false);
@@ -112,17 +108,24 @@ export function useMedia({
 
       let result = { media: [], hasMore: false };
 
-      if (isSecretSearch && searchTerm.length >= 3) {
+      // 1. Search Query Handling (Normal or Secret Search)
+      if (searchTerm.length > 0) {
         const sortBy = activeTab === 'most_viewed' ? 'views_count' : 'created_at';
         const ascending = activeTab === 'most_viewed' ? viewsAsc : recentAsc;
-        const data = await searchMedia(searchTerm, sortBy, ascending);
-        result = { media: data, hasMore: false };
-      } else if (activeTab === 'feed' || activeTab === 'random') {
-        // Pass shuffleTrigger as cache-buster so new random items are fetched
-        result = await getRandomMedia(page, [], shuffleTrigger);
-      } else if (activeTab === 'recent') {
+        
+        // Paginated search requesting 100 items for current page
+        result = await searchMedia(searchTerm, sortBy, ascending, page, 100);
+      } 
+      // 2. Feed or Random Views
+      else if (activeTab === 'feed' || activeTab === 'random') {
+        result = await getRandomMedia(page);
+      } 
+      // 3. Recent Tab View
+      else if (activeTab === 'recent') {
         result = await getRecentMedia(page, recentAsc, categoryIds);
-      } else if (activeTab === 'most_viewed') {
+      } 
+      // 4. Most Viewed Tab View
+      else if (activeTab === 'most_viewed') {
         result = await getMostViewedMedia(page, viewsAsc, categoryIds);
       }
 
@@ -131,7 +134,8 @@ export function useMedia({
       setMedia((prev) => {
         const updated = page === 0 ? fetchedItems : [...prev, ...fetchedItems];
 
-        if (!isSecretSearch) {
+        // Only store in cache if there is no active search
+        if (!trimmedQuery) {
           if (activeTab === 'feed') cacheRef.current.feed = updated;
           if (activeTab === 'random') cacheRef.current.random = updated;
           if (activeTab === 'recent') cacheRef.current.recent[sortKeyRecent] = updated;
@@ -162,6 +166,7 @@ export function useMedia({
   const resetMedia = () => {
     setPage(0);
     setMedia([]);
+    cacheRef.current = { feed: [], random: [], recent: {}, most_viewed: {} };
   };
 
   return {
