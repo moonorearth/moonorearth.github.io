@@ -10,9 +10,9 @@ export default function TabNavigation({ selectedCategories, setSelectedCategorie
 
   const handleCategoryToggle = (cat) => {
     setSelectedCategories((prev = []) => {
-      const exists = prev.some((c) => c.id === cat.id);
+      const exists = prev.some((c) => (typeof c === 'object' ? c.id === cat.id : c === cat.id));
       if (exists) {
-        return prev.filter((c) => c.id !== cat.id);
+        return prev.filter((c) => (typeof c === 'object' ? c.id !== cat.id : c !== cat.id));
       } else {
         return [...prev, cat];
       }
@@ -22,7 +22,9 @@ export default function TabNavigation({ selectedCategories, setSelectedCategorie
   return (
     <div style={styles.container}>
       {categories.map((cat) => {
-        const isSelected = selectedCategories.some((c) => c.id === cat.id);
+        const isSelected = selectedCategories.some((c) => 
+          typeof c === 'object' ? c.id === cat.id : c === cat.id
+        );
         return (
           <button
             key={cat.id}
