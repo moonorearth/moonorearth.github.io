@@ -10,7 +10,7 @@ export default function VideoGrid({
   onSelectVideo,
   isAdmin,
   onModify,
-  emptyMessage = 'No videos found.',
+  emptyMessage = 'No media found.',
 }) {
   if (loading) {
     return (
@@ -20,7 +20,7 @@ export default function VideoGrid({
     );
   }
 
-  if (videos.length === 0) {
+  if (!videos || videos.length === 0) {
     return (
       <p style={{ textAlign: 'center', color: '#888', marginTop: '40px' }}>
         {emptyMessage}
@@ -29,7 +29,7 @@ export default function VideoGrid({
   }
 
   return (
-    <>
+    <div style={styles.gridContainer}>
       <style>{`
         .pinterest-masonry-grid {
           column-count: 5;
@@ -50,6 +50,7 @@ export default function VideoGrid({
         }
       `}</style>
 
+      {/* Masonry Container */}
       <div className="pinterest-masonry-grid">
         {videos.map((video, index) => (
           <VideoCard
@@ -62,6 +63,7 @@ export default function VideoGrid({
         ))}
       </div>
 
+      {/* Spanned Full-Width Load More Container at Bottom */}
       {hasMore && (
         <div style={styles.loadMoreContainer}>
           <button
@@ -69,30 +71,39 @@ export default function VideoGrid({
             onClick={onLoadMore}
             disabled={loadingMore}
           >
-            {loadingMore ? 'Loading...' : 'Load More'}
+            {loadingMore ? 'Loading More...' : 'Load More'}
           </button>
         </div>
       )}
-    </>
+    </div>
   );
 }
 
 const styles = {
+  gridContainer: {
+    width: '100%',
+    display: 'flex',
+    flexDirection: 'column',
+    alignItems: 'center',
+  },
   loadMoreContainer: {
+    width: '100%',
     display: 'flex',
     justifyContent: 'center',
-    marginTop: '36px',
-    marginBottom: '20px',
+    paddingTop: '40px',
+    paddingBottom: '40px',
+    clear: 'both',
   },
   loadMoreBtn: {
     backgroundColor: '#1f1f1f',
     color: '#fff',
     border: '1px solid #333',
-    padding: '12px 28px',
-    borderRadius: '24px',
-    fontSize: '0.9rem',
+    padding: '14px 40px',
+    borderRadius: '28px',
+    fontSize: '0.95rem',
     fontWeight: '600',
     cursor: 'pointer',
-    transition: 'background-color 0.2s ease',
+    transition: 'all 0.2s ease',
+    boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
   },
 };
