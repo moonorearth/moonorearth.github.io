@@ -40,9 +40,6 @@ export async function incrementVideoViews(id) {
 
 export const incrementMediaViews = incrementVideoViews;
 
-/**
- * Fetch all available categories for dropdowns & selection
- */
 export async function getCategories() {
   const { data, error } = await supabase.from('categories').select('*').order('name', { ascending: true });
   if (error) {
@@ -53,43 +50,71 @@ export async function getCategories() {
 }
 
 /**
- * Fetch recent media with multi-category filtering AND sorting support
+ * Fetch recent media with multi-category filtering AND server-side pagination
  */
 export async function getRecentMedia(page = 0, recentAsc = false, categoryIds = []) {
   const from = page * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
+  const rawIds = (categoryIds || [])
+    .map(c => (typeof c === 'object' && c !== null ? c.id : c))
+    .filter(Boolean);
+
   let query = supabase.from('media');
 
-  if (categoryIds && categoryIds.length > 0) {
-    const { data: catRows } = await supabase
-      .from('media_categories')
-      .select('media_id, category_id')
-      .in('category_id', categoryIds);
+  if (rawIds.length === 1) {
+    const { data, error, count } = await supabase
+      .from('media')
+      .select('*, media_categories!inner(category_id, categories(*))', { count: 'exact' })
+      .eq('media_categories.category_id', rawIds[0])
+      .order('created_at', { ascending: recentAsc })
+      .range(from, to);
 
-    if (!catRows || catRows.length === 0) {
+    if (error) {
+      console.error('Error fetching recent media by category:', error);
       return { media: [], videos: [], hasMore: false };
     }
 
-    const mediaCountMap = new Map();
-    catRows.forEach((r) => {
-      mediaCountMap.set(r.media_id, (mediaCountMap.get(r.media_id) || 0) + 1);
-    });
+    const items = (data || []).map(item => ({
+      ...item,
+      categories: item.media_categories?.map(mc => mc.categories).filter(Boolean) || [],
+    }));
 
-    const matchingMediaIds = Array.from(mediaCountMap.entries())
-      .filter(([_, count]) => count === categoryIds.length)
-      .map(([id]) => id);
+    return {
+      media: items,
+      videos: items,
+      hasMore: count ? (from + items.length) < count : items.length === PAGE_SIZE,
+    };
+  }
 
-    if (matchingMediaIds.length === 0) {
+  if (rawIds.length > 1) {
+    const { data, error } = await supabase
+      .from('media')
+      .select('*, media_categories!inner(category_id, categories(*))')
+      .in('media_categories.category_id', rawIds)
+      .order('created_at', { ascending: recentAsc });
+
+    if (error) {
+      console.error('Error fetching multi-category media:', error);
       return { media: [], videos: [], hasMore: false };
     }
 
-    query = query.select('*, media_categories(category_id, categories(*))', { count: 'exact' }).in('id', matchingMediaIds);
-  } else {
-    query = query.select('*, media_categories(category_id, categories(*))', { count: 'exact' });
+    const filtered = (data || []).filter((item) => {
+      const itemCatIds = new Set((item.media_categories || []).map(mc => mc.category_id));
+      return rawIds.every(reqId => itemCatIds.has(reqId));
+    }).map(item => ({
+      ...item,
+      categories: item.media_categories?.map(mc => mc.categories).filter(Boolean) || [],
+    }));
+
+    const paginated = filtered.slice(from, from + PAGE_SIZE);
+    const hasMore = (from + PAGE_SIZE) < filtered.length;
+
+    return { media: paginated, videos: paginated, hasMore };
   }
 
   const { data, error, count } = await query
+    .select('*, media_categories(category_id, categories(*))', { count: 'exact' })
     .order('created_at', { ascending: recentAsc })
     .range(from, to);
 
@@ -106,50 +131,77 @@ export async function getRecentMedia(page = 0, recentAsc = false, categoryIds = 
   return {
     media: items,
     videos: items,
-    hasMore: count ? to + 1 < count : false,
+    hasMore: count ? (from + items.length) < count : false,
   };
 }
 
 export const getRecentVideos = getRecentMedia;
 
 /**
- * Fetch most viewed media with multi-category filtering AND sorting support
+ * Fetch most viewed media with multi-category filtering AND server-side pagination
  */
 export async function getMostViewedMedia(page = 0, viewsAsc = false, categoryIds = []) {
   const from = page * PAGE_SIZE;
   const to = from + PAGE_SIZE - 1;
 
-  let query = supabase.from('media');
+  const rawIds = (categoryIds || [])
+    .map(c => (typeof c === 'object' && c !== null ? c.id : c))
+    .filter(Boolean);
 
-  if (categoryIds && categoryIds.length > 0) {
-    const { data: catRows } = await supabase
-      .from('media_categories')
-      .select('media_id, category_id')
-      .in('category_id', categoryIds);
+  if (rawIds.length === 1) {
+    const { data, error, count } = await supabase
+      .from('media')
+      .select('*, media_categories!inner(category_id, categories(*))', { count: 'exact' })
+      .eq('media_categories.category_id', rawIds[0])
+      .order('views_count', { ascending: viewsAsc })
+      .range(from, to);
 
-    if (!catRows || catRows.length === 0) {
+    if (error) {
+      console.error('Error fetching most viewed media by category:', error);
       return { media: [], videos: [], hasMore: false };
     }
 
-    const mediaCountMap = new Map();
-    catRows.forEach((r) => {
-      mediaCountMap.set(r.media_id, (mediaCountMap.get(r.media_id) || 0) + 1);
-    });
+    const items = (data || []).map(item => ({
+      ...item,
+      categories: item.media_categories?.map(mc => mc.categories).filter(Boolean) || [],
+    }));
 
-    const matchingMediaIds = Array.from(mediaCountMap.entries())
-      .filter(([_, count]) => count === categoryIds.length)
-      .map(([id]) => id);
-
-    if (matchingMediaIds.length === 0) {
-      return { media: [], videos: [], hasMore: false };
-    }
-
-    query = query.select('*, media_categories(category_id, categories(*))', { count: 'exact' }).in('id', matchingMediaIds);
-  } else {
-    query = query.select('*, media_categories(category_id, categories(*))', { count: 'exact' });
+    return {
+      media: items,
+      videos: items,
+      hasMore: count ? (from + items.length) < count : items.length === PAGE_SIZE,
+    };
   }
 
-  const { data, error, count } = await query
+  if (rawIds.length > 1) {
+    const { data, error } = await supabase
+      .from('media')
+      .select('*, media_categories!inner(category_id, categories(*))')
+      .in('media_categories.category_id', rawIds)
+      .order('views_count', { ascending: viewsAsc });
+
+    if (error) {
+      console.error('Error fetching multi-category most viewed media:', error);
+      return { media: [], videos: [], hasMore: false };
+    }
+
+    const filtered = (data || []).filter((item) => {
+      const itemCatIds = new Set((item.media_categories || []).map(mc => mc.category_id));
+      return rawIds.every(reqId => itemCatIds.has(reqId));
+    }).map(item => ({
+      ...item,
+      categories: item.media_categories?.map(mc => mc.categories).filter(Boolean) || [],
+    }));
+
+    const paginated = filtered.slice(from, from + PAGE_SIZE);
+    const hasMore = (from + PAGE_SIZE) < filtered.length;
+
+    return { media: paginated, videos: paginated, hasMore };
+  }
+
+  const { data, error, count } = await supabase
+    .from('media')
+    .select('*, media_categories(category_id, categories(*))', { count: 'exact' })
     .order('views_count', { ascending: viewsAsc })
     .range(from, to);
 
@@ -166,7 +218,7 @@ export async function getMostViewedMedia(page = 0, viewsAsc = false, categoryIds
   return {
     media: items,
     videos: items,
-    hasMore: count ? to + 1 < count : false,
+    hasMore: count ? (from + items.length) < count : false,
   };
 }
 
@@ -201,29 +253,39 @@ export async function getRandomMedia(page = 0) {
 
 export const getRandomVideos = getRandomMedia;
 
-export async function searchMedia(query, sortBy = 'created_at', ascending = false) {
-  const { data, error } = await supabase
+/**
+ * Search media with strict 100-item server-side pagination
+ */
+export async function searchMedia(query, sortBy = 'created_at', ascending = false, page = 0, limit = PAGE_SIZE) {
+  const from = page * limit;
+  const to = from + limit - 1;
+
+  const { data, error, count } = await supabase
     .from('media')
-    .select('*, media_categories(category_id, categories(*))')
+    .select('*, media_categories(category_id, categories(*))', { count: 'exact' })
     .ilike('title', `%${query}%`)
-    .order(sortBy, { ascending });
+    .order(sortBy, { ascending })
+    .range(from, to);
 
   if (error) {
     console.error('Error searching media:', error);
-    return [];
+    return { media: [], videos: [], hasMore: false };
   }
 
-  return (data || []).map(item => ({
+  const items = (data || []).map((item) => ({
     ...item,
-    categories: item.media_categories?.map(mc => mc.categories).filter(Boolean) || [],
+    categories: item.media_categories?.map((mc) => mc.categories).filter(Boolean) || [],
   }));
+
+  return {
+    media: items,
+    videos: items,
+    hasMore: count ? (from + items.length) < count : false,
+  };
 }
 
 export const searchVideos = searchMedia;
 
-/**
- * Add new media entry and connect multiple categories in junction table
- */
 export async function addMedia(mediaData, categoryIds = []) {
   const { data, error } = await supabase
     .from('media')
@@ -248,9 +310,6 @@ export async function addMedia(mediaData, categoryIds = []) {
   return newMedia;
 }
 
-/**
- * Update media entry by ID and synchronize multiple categories
- */
 export async function updateMedia(id, updates, categoryIds = null) {
   const { data, error } = await supabase
     .from('media')
@@ -278,9 +337,6 @@ export async function updateMedia(id, updates, categoryIds = null) {
   return data?.[0];
 }
 
-/**
- * Delete media entry by ID
- */
 export async function deleteMedia(id) {
   const { error } = await supabase
     .from('media')
