@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabaseClient';
 
-const PAGE_SIZE = 12;
+const PAGE_SIZE = 100;
 
 // Fetch all available categories for the UI pills
 export async function getAllCategories() {
@@ -17,23 +17,43 @@ export async function getAllCategories() {
 }
 
 /**
- * Fetch media items tagged with ALL selected categories (AND condition)
- * @param {Array<string|number>} categoryIds - Array of category IDs
- * @param {number} page - Page index for pagination
- * @param {number} limit - Items per page
+ * Fetch strictly 100 media items directly from DB based on selected categories and sort mode
+ * @param {Array<string|object>} categoriesInput - Selected category UUIDs or Objects
+ * @param {number} page - Page index (0 = first 100 items, 1 = next 100 items)
+ * @param {string} sortBy - 'recent' (created_at DESC) or 'popular' (views_count/likes_count DESC)
+ * @param {number} limit - Items per request (default 100)
  */
-export async function getMediaByCategories(categoryIds = [], page = 0, limit = 12) {
-  if (!categoryIds || categoryIds.length === 0) {
+export async function getMediaByCategories(
+  categoriesInput = [],
+  page = 0,
+  sortBy = 'recent',
+  limit = PAGE_SIZE
+) {
+  if (!categoriesInput || categoriesInput.length === 0) {
     return { media: [], videos: [], hasMore: false };
   }
 
-  // Fetch all media linked to ANY of the selected category IDs
-  const { data, error } = await supabase
-    .from('media_categories')
-    .select(`
-      media_id,
-      category_id,
-      media:media_id (
+  // Extract raw UUID strings whether objects or string IDs were passed
+  const categoryIds = (Array.isArray(categoriesInput) ? categoriesInput : [categoriesInput])
+    .map((item) => (typeof item === 'object' && item !== null ? item.id : item))
+    .filter(Boolean);
+
+  if (categoryIds.length === 0) {
+    return { media: [], videos: [], hasMore: false };
+  }
+
+  // Exact 100-item boundaries: Page 0 = 0..99, Page 1 = 100..199
+  const from = page * limit;
+  const to = from + limit - 1;
+
+  // Determine ordering column
+  const orderColumn = sortBy === 'popular' ? 'views_count' : 'created_at';
+
+  // Single Category Selected (e.g., clicking Instagram tag)
+  if (categoryIds.length === 1) {
+    const { data, error, count } = await supabase
+      .from('media')
+      .select(`
         id,
         title,
         media_type,
@@ -42,40 +62,60 @@ export async function getMediaByCategories(categoryIds = [], page = 0, limit = 1
         embed_url,
         views_count,
         likes_count,
-        created_at
-      )
+        created_at,
+        media_categories!inner(category_id)
+      `, { count: 'exact' })
+      .eq('media_categories.category_id', categoryIds[0])
+      .order(orderColumn, { ascending: false })
+      .range(from, to);
+
+    if (error) {
+      console.error('Error fetching category media:', error);
+      return { media: [], videos: [], hasMore: false };
+    }
+
+    const mediaList = data || [];
+    const totalFetchedSoFar = from + mediaList.length;
+    const hasMore = count ? totalFetchedSoFar < count : mediaList.length === limit;
+
+    return {
+      media: mediaList,
+      videos: mediaList,
+      hasMore,
+    };
+  }
+
+  // Multi-Category Selected (Matches media containing ALL selected tags)
+  const { data, error } = await supabase
+    .from('media')
+    .select(`
+      id,
+      title,
+      media_type,
+      thumbnail_url,
+      image_url,
+      embed_url,
+      views_count,
+      likes_count,
+      created_at,
+      media_categories!inner(category_id)
     `)
-    .in('category_id', categoryIds);
+    .in('media_categories.category_id', categoryIds)
+    .order(orderColumn, { ascending: false });
 
   if (error) {
-    console.error('Error fetching media by categories:', error);
+    console.error('Error fetching multi-category media:', error);
     return { media: [], videos: [], hasMore: false };
   }
 
-  // Group fetched junction rows by media_id
-  const mediaMap = new Map();
-  (data || []).forEach((item) => {
-    if (!item.media) return;
-    const existing = mediaMap.get(item.media_id) || {
-      media: item.media,
-      categoryIds: new Set(),
-    };
-    existing.categoryIds.add(item.category_id);
-    mediaMap.set(item.media_id, existing);
+  // Keep media that contains ALL selected tag IDs
+  const filteredMedia = (data || []).filter((mediaItem) => {
+    const itemCatIds = new Set((mediaItem.media_categories || []).map((mc) => mc.category_id));
+    return categoryIds.every((reqId) => itemCatIds.has(reqId));
   });
 
-  // Strict "AND" condition: keep only media containing ALL requested category IDs
-  const matchedMedia = Array.from(mediaMap.values())
-    .filter((entry) =>
-      categoryIds.every((reqCatId) => entry.categoryIds.has(reqCatId))
-    )
-    .map((entry) => entry.media);
-
-  // Paginate filtered results client-side
-  const from = page * limit;
-  const to = from + limit;
-  const paginatedMedia = matchedMedia.slice(from, to);
-  const hasMore = to < matchedMedia.length;
+  const paginatedMedia = filteredMedia.slice(from, from + limit);
+  const hasMore = (from + limit) < filteredMedia.length;
 
   return {
     media: paginatedMedia,
@@ -84,6 +124,5 @@ export async function getMediaByCategories(categoryIds = [], page = 0, limit = 1
   };
 }
 
-// Backward compatibility alias
 export const getVideosByCategory = getMediaByCategories;
 export const getMediaByCategory = getMediaByCategories;
