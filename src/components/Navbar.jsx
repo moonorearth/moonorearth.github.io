@@ -105,6 +105,7 @@ export default function Navbar({
     { id: 'recent', label: '✨ Recent' },
     { id: 'most_viewed', label: '🔥 Most Viewed' },
     { id: 'requests', label: '🗫 Chat' },
+    { id: 'donate', label: '☕ Donate' },
   ];
 
   const showCategoryPills = activeTab === 'recent' || activeTab === 'most_viewed';
