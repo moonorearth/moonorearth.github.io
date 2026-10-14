@@ -11,6 +11,7 @@ import RandomView from './components/RandomView';
 import LoginView from './components/LoginView';
 import AddMediaModal from './components/AddMediaModal';
 import ModifyMediaView from './components/ModifyMediaView';
+import DonateView from './components/DonateView';
 
 import { useDebounce } from './hooks/useDebounce';
 import { useMedia } from './hooks/useMedia';
@@ -194,7 +195,13 @@ export default function App() {
           <ChatView isUnlocked={isUnlocked} isAdmin={isAdmin} />
         </div>
 
-        {activeTab !== 'feed' && activeTab !== 'random' && activeTab !== 'requests' && (
+        {/* DONATE VIEW RENDER BLOCK HERE */}
+        <div style={{ display: activeTab === 'donate' ? 'block' : 'none' }}>
+          <DonateView />
+        </div>
+
+        {/* EXCLUDE 'donate' FROM VIDEO GRID */}
+        {activeTab !== 'feed' && activeTab !== 'random' && activeTab !== 'requests' && activeTab !== 'donate' && (
           <VideoGrid
             videos={videoData.videos}
             loading={videoData.loading}
@@ -280,7 +287,7 @@ export default function App() {
 const styles = {
   fabContainer: {
     position: 'fixed',
-    bottom: '48px', // Positioned higher up from bottom
+    bottom: '48px',
     right: '24px',
     display: 'flex',
     flexDirection: 'column',
