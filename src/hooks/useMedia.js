@@ -68,10 +68,13 @@ export function useMedia({
 
     const trimmedQuery = debouncedSearchQuery ? debouncedSearchQuery.trim() : '';
     const isSecretSearch = trimmedQuery.startsWith('?');
-    const searchTerm = isSecretSearch ? trimmedQuery.slice(1).trim() : trimmedQuery;
+    const searchTerm = isSecretSearch ? trimmedQuery.slice(1).trim() : '';
 
-    // Ignore secret searches shorter than 3 characters
-    if (isSecretSearch && searchTerm.length < 3) {
+    // Ignore non-secret typing OR secret searches without query text
+    if (
+      (trimmedQuery !== '' && !isSecretSearch) ||
+      (isSecretSearch && searchTerm.length === 0)
+    ) {
       return;
     }
 
@@ -79,7 +82,7 @@ export function useMedia({
     const sortKeyViews = `${categoryKey}_${viewsAsc ? 'asc' : 'desc'}`;
 
     // Cache hit check on page 0 (Disabled when active search query exists)
-    if (!trimmedQuery && page === 0) {
+    if (!isSecretSearch && page === 0) {
       if (activeTab === 'feed' && cacheRef.current.feed.length > 0) {
         setMedia(cacheRef.current.feed);
         setHasMore(false);
@@ -108,23 +111,22 @@ export function useMedia({
 
       let result = { media: [], hasMore: false };
 
-      // 1. Search Query Handling (Normal or Secret Search)
-      if (searchTerm.length > 0) {
+      // Secret Search Handling (only triggers if starts with '?')
+      if (isSecretSearch && searchTerm.length > 0) {
         const sortBy = activeTab === 'most_viewed' ? 'views_count' : 'created_at';
         const ascending = activeTab === 'most_viewed' ? viewsAsc : recentAsc;
         
-        // Paginated search requesting 100 items for current page
-        result = await searchMedia(searchTerm, sortBy, ascending, page, 100);
+        result = await searchMedia(debouncedSearchQuery, sortBy, ascending, page, 100);
       } 
-      // 2. Feed or Random Views
+      // Feed or Random Views
       else if (activeTab === 'feed' || activeTab === 'random') {
         result = await getRandomMedia(page);
       } 
-      // 3. Recent Tab View
+      // Recent Tab View
       else if (activeTab === 'recent') {
         result = await getRecentMedia(page, recentAsc, categoryIds);
       } 
-      // 4. Most Viewed Tab View
+      // Most Viewed Tab View
       else if (activeTab === 'most_viewed') {
         result = await getMostViewedMedia(page, viewsAsc, categoryIds);
       }
@@ -134,8 +136,8 @@ export function useMedia({
       setMedia((prev) => {
         const updated = page === 0 ? fetchedItems : [...prev, ...fetchedItems];
 
-        // Only store in cache if there is no active search
-        if (!trimmedQuery) {
+        // Cache results only when NOT searching
+        if (!isSecretSearch) {
           if (activeTab === 'feed') cacheRef.current.feed = updated;
           if (activeTab === 'random') cacheRef.current.random = updated;
           if (activeTab === 'recent') cacheRef.current.recent[sortKeyRecent] = updated;
