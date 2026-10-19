@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabaseClient';
 
-const PAGE_SIZE = 60;
+const PAGE_SIZE = 100;
 
 export async function incrementLikes(id) {
   try {
@@ -254,16 +254,31 @@ export async function getRandomMedia(page = 0) {
 export const getRandomVideos = getRandomMedia;
 
 /**
- * Search media with strict 100-item server-side pagination
+ * Search media with secret prefix ('?') support
  */
-export async function searchMedia(query, sortBy = 'created_at', ascending = false, page = 0, limit = PAGE_SIZE) {
+export async function searchMedia(rawQuery, sortBy = 'created_at', ascending = false, page = 0, limit = PAGE_SIZE) {
+  const trimmed = (rawQuery || '').trim();
+
+  // Query MUST start with '?' to trigger search
+  if (!trimmed.startsWith('?')) {
+    return { media: [], videos: [], hasMore: false };
+  }
+
+  // Strip leading '?' and trim remaining query string
+  const searchTerm = trimmed.slice(1).trim();
+
+  // Do not send request if no actual query text exists after stripping '?'
+  if (!searchTerm) {
+    return { media: [], videos: [], hasMore: false };
+  }
+
   const from = page * limit;
   const to = from + limit - 1;
 
   const { data, error, count } = await supabase
     .from('media')
     .select('*, media_categories(category_id, categories(*))', { count: 'exact' })
-    .ilike('title', `%${query}%`)
+    .ilike('title', `%${searchTerm}%`)
     .order(sortBy, { ascending })
     .range(from, to);
 
