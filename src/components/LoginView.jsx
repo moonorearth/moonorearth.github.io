@@ -31,7 +31,10 @@ export default function LoginView({ onClose, onLoginSuccess, onLogoutSuccess }) 
       return;
     }
 
-    const isAdmin = data?.user?.email === 'admin@test.com';
+    // Record login timestamp
+    localStorage.setItem('login_timestamp', Date.now().toString());
+
+    const isAdmin = data?.user?.email === 'admin@test.com' || data?.user?.app_metadata?.role === 'admin';
     onLoginSuccess?.({ isAdmin, user: data?.user });
     onClose();
   };
@@ -48,6 +51,9 @@ export default function LoginView({ onClose, onLoginSuccess, onLogoutSuccess }) 
       setError(signOutError.message || 'Failed to sign out');
       return;
     }
+
+    // Clean up login timestamp on explicit logout
+    localStorage.removeItem('login_timestamp');
 
     onLogoutSuccess?.();
     onClose();
@@ -191,7 +197,7 @@ const styles = {
     WebkitBackdropFilter: 'blur(20px)',
     border: '1px solid rgba(255, 255, 255, 0.1)',
     borderRadius: '24px',
-    padding: '48px 20px 20px 20px', // Top padding ensures close button has clear spacing
+    padding: '48px 20px 20px 20px',
     width: '100%',
     maxWidth: '320px',
     boxShadow: '0 24px 48px -12px rgba(0, 0, 0, 0.7), inset 0 1px 0 0 rgba(255, 255, 255, 0.1)',
