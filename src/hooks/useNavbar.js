@@ -9,30 +9,26 @@ export function useNavbar(activeTab) {
   const [hasUnreadChat, setHasUnreadChat] = useState(false);
   const [onlineCount, setOnlineCount] = useState(1);
 
-  // Fetch Categories
+  // Load Categories on mount
   useEffect(() => {
-    async function fetchCategories() {
-      try {
-        const catData = await getAllCategories();
-        setCategories(catData || []);
-      } catch (err) {
-        console.error('Failed to load categories:', err);
-      }
-    }
-    fetchCategories();
+    getAllCategories()
+      .then((catData) => setCategories(catData || []))
+      .catch((err) => console.error('Failed to load categories:', err));
   }, []);
 
-  // Realtime Presence Tracker
+  // Single Combined Realtime Channel (Presence + Chat Notifications)
   useEffect(() => {
-    const channel = supabase.channel('global-presence', {
+    const channel = supabase.channel('navbar-global-channel', {
       config: { presence: { key: Math.random().toString(36).substring(2, 9) } },
     });
 
     channel
       .on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState();
-        const count = Object.keys(state).length;
+        const count = Object.keys(channel.presenceState()).length;
         setOnlineCount(count > 0 ? count : 1);
+      })
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat' }, () => {
+        if (activeTab !== 'requests') setHasUnreadChat(true);
       })
       .subscribe(async (status) => {
         if (status === 'SUBSCRIBED') {
@@ -43,70 +39,32 @@ export function useNavbar(activeTab) {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
-
-  // Unread Realtime Listener for Chat Tab
-  useEffect(() => {
-    const channel = supabase
-      .channel('chat-notifications')
-      .on(
-        'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'chat' },
-        () => {
-          if (activeTab !== 'requests') {
-            setHasUnreadChat(true);
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(channel);
-    };
   }, [activeTab]);
 
-  // Reset navbar visibility and unread indicator when switching tabs
+  // Tab Switch Handling
   useEffect(() => {
     setShowNavbar(true);
     setLastScrollY(0);
-    if (activeTab === 'requests') {
-      setHasUnreadChat(false);
-    }
+    if (activeTab === 'requests') setHasUnreadChat(false);
   }, [activeTab]);
 
-  // Scroll listener to hide/show navbar
+  // Scroll Position Listener
   useEffect(() => {
     const handleScroll = (e) => {
-      let currentScrollY = 0;
-      if (e.target && e.target !== document && e.target !== window) {
-        currentScrollY = e.target.scrollTop;
-      } else {
-        currentScrollY = window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
-      }
+      const scrollY = e.target && e.target !== document && e.target !== window 
+        ? e.target.scrollTop 
+        : window.scrollY || document.documentElement.scrollTop || document.body.scrollTop || 0;
 
-      const diff = currentScrollY - lastScrollY;
+      const diff = scrollY - lastScrollY;
       if (Math.abs(diff) < 5) return;
 
-      if (currentScrollY < 20) {
-        setShowNavbar(true);
-      } else if (diff > 0) {
-        setShowNavbar(false);
-      } else if (diff < 0) {
-        setShowNavbar(true);
-      }
-
-      setLastScrollY(currentScrollY);
+      setShowNavbar(scrollY < 20 || diff < 0);
+      setLastScrollY(scrollY);
     };
 
     window.addEventListener('scroll', handleScroll, true);
     return () => window.removeEventListener('scroll', handleScroll, true);
   }, [lastScrollY]);
 
-  return {
-    showNavbar,
-    categories,
-    hasUnreadChat,
-    setHasUnreadChat,
-    onlineCount,
-  };
+  return { showNavbar, categories, hasUnreadChat, setHasUnreadChat, onlineCount };
 }
