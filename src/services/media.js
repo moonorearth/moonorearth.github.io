@@ -88,29 +88,28 @@ export async function getRecentMedia(page = 0, recentAsc = false, categoryIds = 
   }
 
   if (rawIds.length > 1) {
-    const { data, error } = await supabase
+    const { data, error, count } = await supabase
       .from('media')
-      .select('*, media_categories!inner(category_id, categories(*))')
+      .select('*, media_categories!inner(category_id, categories(*))', { count: 'exact' })
       .in('media_categories.category_id', rawIds)
-      .order('created_at', { ascending: recentAsc });
+      .order('created_at', { ascending: recentAsc })
+      .range(from, to);
 
     if (error) {
       console.error('Error fetching multi-category media:', error);
       return { media: [], videos: [], hasMore: false };
     }
 
-    const filtered = (data || []).filter((item) => {
-      const itemCatIds = new Set((item.media_categories || []).map(mc => mc.category_id));
-      return rawIds.every(reqId => itemCatIds.has(reqId));
-    }).map(item => ({
+    const items = (data || []).map(item => ({
       ...item,
       categories: item.media_categories?.map(mc => mc.categories).filter(Boolean) || [],
     }));
 
-    const paginated = filtered.slice(from, from + PAGE_SIZE);
-    const hasMore = (from + PAGE_SIZE) < filtered.length;
-
-    return { media: paginated, videos: paginated, hasMore };
+    return {
+      media: items,
+      videos: items,
+      hasMore: count ? (from + items.length) < count : items.length === PAGE_SIZE,
+    };
   }
 
   const { data, error, count } = await query
@@ -174,29 +173,28 @@ export async function getMostViewedMedia(page = 0, viewsAsc = false, categoryIds
   }
 
   if (rawIds.length > 1) {
-    const { data, error } = await supabase
+    const { data, error, count } = await supabase
       .from('media')
-      .select('*, media_categories!inner(category_id, categories(*))')
+      .select('*, media_categories!inner(category_id, categories(*))', { count: 'exact' })
       .in('media_categories.category_id', rawIds)
-      .order('views_count', { ascending: viewsAsc });
+      .order('views_count', { ascending: viewsAsc })
+      .range(from, to);
 
     if (error) {
       console.error('Error fetching multi-category most viewed media:', error);
       return { media: [], videos: [], hasMore: false };
     }
 
-    const filtered = (data || []).filter((item) => {
-      const itemCatIds = new Set((item.media_categories || []).map(mc => mc.category_id));
-      return rawIds.every(reqId => itemCatIds.has(reqId));
-    }).map(item => ({
+    const items = (data || []).map(item => ({
       ...item,
       categories: item.media_categories?.map(mc => mc.categories).filter(Boolean) || [],
     }));
 
-    const paginated = filtered.slice(from, from + PAGE_SIZE);
-    const hasMore = (from + PAGE_SIZE) < filtered.length;
-
-    return { media: paginated, videos: paginated, hasMore };
+    return {
+      media: items,
+      videos: items,
+      hasMore: count ? (from + items.length) < count : items.length === PAGE_SIZE,
+    };
   }
 
   const { data, error, count } = await supabase
@@ -259,15 +257,12 @@ export const getRandomVideos = getRandomMedia;
 export async function searchMedia(rawQuery, sortBy = 'created_at', ascending = false, page = 0, limit = PAGE_SIZE) {
   const trimmed = (rawQuery || '').trim();
 
-  // Query MUST start with '?' to trigger search
   if (!trimmed.startsWith('?')) {
     return { media: [], videos: [], hasMore: false };
   }
 
-  // Strip leading '?' and trim remaining query string
   const searchTerm = trimmed.slice(1).trim();
 
-  // Do not send request if no actual query text exists after stripping '?'
   if (!searchTerm) {
     return { media: [], videos: [], hasMore: false };
   }
