@@ -16,25 +16,15 @@ export function useNavbar(activeTab) {
       .catch((err) => console.error('Failed to load categories:', err));
   }, []);
 
-  // Single Combined Realtime Channel (Presence + Chat Notifications)
+  // Realtime Channel for Chat Notifications (Presence Disabled to reduce log volume)
   useEffect(() => {
-    const channel = supabase.channel('navbar-global-channel', {
-      config: { presence: { key: Math.random().toString(36).substring(2, 9) } },
-    });
+    const channel = supabase.channel('navbar-global-channel');
 
     channel
-      .on('presence', { event: 'sync' }, () => {
-        const count = Object.keys(channel.presenceState()).length;
-        setOnlineCount(count > 0 ? count : 1);
-      })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'chat' }, () => {
         if (activeTab !== 'requests') setHasUnreadChat(true);
       })
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          await channel.track({ online_at: new Date().toISOString() });
-        }
-      });
+      .subscribe();
 
     return () => {
       supabase.removeChannel(channel);
