@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect, useLayoutEffect } from 'react';
-import { incrementVideoViews } from '../services/media';
 import { getMediaThumbnail } from '../utils/mediaHelpers';
 
 export default function ShortsFeed({ items = [], onLoadMore, hasMore, onSelectCategory }) {
@@ -77,10 +76,6 @@ function ShortsCard({ item, isFullscreen, onToggleFullscreen, onSelectCategory }
 
   const isImage = item.media_type === 'image';
   const displayImageUrl = item.image_url || getMediaThumbnail(item);
-
-  useEffect(() => {
-    if (item?.id) incrementVideoViews(item.id);
-  }, [item?.id]);
 
   const togglePlayPause = () => {
     if (isImage || !videoRef.current) return;
