@@ -16,6 +16,7 @@ import ActionDock from './components/ActionDock';
 import { useDebounce } from './hooks/useDebounce';
 import { useMedia } from './hooks/useMedia';
 import { useAuthSession } from './hooks/useAuthSession';
+import { incrementVideoViews } from './services/media';
 
 export default function App() {
   const {
@@ -67,6 +68,18 @@ export default function App() {
     viewsAsc,
     shuffleTrigger,
   });
+
+  // Explicit user click handler: increments view only on real user interaction
+  const handleSelectVideo = (video) => {
+    if (video?.id) {
+      const viewedKey = `viewed_${video.id}`;
+      if (!sessionStorage.getItem(viewedKey)) {
+        sessionStorage.setItem(viewedKey, 'true');
+        incrementVideoViews(video.id);
+      }
+    }
+    setSelectedVideo(video);
+  };
 
   const handleTabChange = (tab) => {
     localStorage.setItem('activeTab', tab);
@@ -145,7 +158,7 @@ export default function App() {
             hasMore={videoData.hasMore}
             loadingMore={videoData.loadingMore}
             onLoadMore={videoData.loadMore}
-            onSelectVideo={setSelectedVideo}
+            onSelectVideo={handleSelectVideo}
             onReshuffle={() => setShuffleTrigger((prev) => prev + 1)}
             isAdmin={isAdmin}
             onModify={setModifyingItem}
@@ -167,7 +180,7 @@ export default function App() {
             hasMore={videoData.hasMore}
             loadingMore={videoData.loadingMore}
             onLoadMore={videoData.loadMore}
-            onSelectVideo={setSelectedVideo}
+            onSelectVideo={handleSelectVideo}
             isAdmin={isAdmin}
             onModify={setModifyingItem}
           />
