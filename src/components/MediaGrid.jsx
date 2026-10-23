@@ -1,5 +1,6 @@
 import React from 'react';
 import VideoCard from './MediaCard';
+import JuicyBanner from './JuicyBanner';
 
 export default function VideoGrid({
   videos,
@@ -50,6 +51,9 @@ export default function VideoGrid({
         }
       `}</style>
 
+      {/* Top Leaderboard Banner (728x90) */}
+      <JuicyBanner zoneId="1129773" width="728" height="90" />
+
       {/* Masonry Container */}
       <div className="pinterest-masonry-grid">
         {videos.map((video, index) => (
@@ -62,6 +66,9 @@ export default function VideoGrid({
           />
         ))}
       </div>
+
+      {/* Bottom Feed Banner (300x100) */}
+      <JuicyBanner zoneId="1129774" width="300" height="100" />
 
       {/* Spanned Full-Width Load More Container at Bottom */}
       {hasMore && (
