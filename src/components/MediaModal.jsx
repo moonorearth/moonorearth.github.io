@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { getMediaThumbnail, getFullMediaUrl } from '../utils/mediaHelpers';
 import { incrementVideoViews } from '../services/media';
+import JuicyBanner from './JuicyBanner';
 
 export default function MediaModal({ item, onClose }) {
   const modalRef = useRef(null);
@@ -203,6 +204,9 @@ export default function MediaModal({ item, onClose }) {
               <h3 style={styles.title}>{item.title}</h3>
             </div>
             {item.views_count !== undefined && <span style={styles.views}>{item.views_count} views</span>}
+
+            {/* Square Banner Inside Modal (300x250) */}
+            <JuicyBanner zoneId="1129772" width="300" height="250" />
           </div>
         )}
       </div>
@@ -303,6 +307,8 @@ const styles = {
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#141414',
+    flexWrap: 'wrap',
+    gap: '12px',
   },
   titleRow: { display: 'flex', alignItems: 'center', gap: '10px' },
   title: { color: '#eee', fontSize: '1.1rem', margin: 0, fontWeight: '600' },
